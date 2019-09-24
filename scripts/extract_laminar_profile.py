@@ -42,25 +42,35 @@ def extract_profile_from_output(fname, x1, x2):
         Theta = scipy.interpolate.interp1d(array(s), array(Theta), 'cubic')
         return sInterp, Ue(sInterp), Dstar(sInterp), Theta(sInterp)
 
-def extract_profile_from_dir(dirname):
+def extract_profile_from_dir(dirname, airfoil, Re, failed_cases):
     for alpha in range(-4, 9):
         fname = os.path.join(dirname, 'xfoil.{}.stdout'.format(alpha))
         x1, x2 = extract_transition_from_output(fname)
         fname = os.path.join(dirname, 'alfa.{}.txt'.format(alpha))
-        data = extract_profile_from_output(fname, x1, x2)
-        if data:
-            save(os.path.join(dirname, 'laminar.{}.npy'.format(alpha)), data)
+        try:
+            data = extract_profile_from_output(fname, x1, x2)
+            if data:
+	            save(os.path.join(dirname, 'laminar.{}.npy'.format(alpha)), data)
+        except:
+            # write line to output file
+            caseString= str(airfoil) + ',' + str(Re) + ',' + str(alpha)
+            print(caseString)
+            failed_cases.write(caseString)
+            failed_cases.write("\n")
 
 def extract_profile(args):
     fname, Re = args
     if fname.endswith('.dat'): fname = fname[:-4]
     subpath = os.path.join(basepath, 'profiles', fname, str(Re))
-    extract_profile_from_dir(subpath)
+    failed_cases = open("failed_cases.txt", "a")
+    extract_profile_from_dir(subpath, fname, Re, failed_cases)
+    failed_cases.close()
 
 if __name__ == '__main__':
+    Nfiles = 1513
     files = sorted(os.listdir(os.path.join(basepath, 'coordinates')))
     Res = [500, 1000, 2000, 5000, 10000, 20000, 50000, 100000, 200000,
            500000, 1000000, 2000000, 5000000, 10000000, 20000000,
            50000000, 100000000, 200000000, 500000000, 1000000000]
     pool = multiprocessing.Pool()
-    pool.map(extract_profile, itertools.product(files[:1], Res))
+    pool.map(extract_profile, itertools.product(files[0:Nfiles], Res))

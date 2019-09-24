@@ -44,14 +44,15 @@ def coordinate_to_profiles(args):
                     p.stdin.flush()
                     time.sleep(0.1)
             except:
-                _,_,tb = sys.exe_info()
+                _,_,tb = sys.exc_info()
                 traceback.print_tb(tb)
             p.kill()
 
 if __name__ == '__main__':
+    Nfiles = 1513
     files = sorted(os.listdir(os.path.join(basepath, 'coordinates')))
     Res = [500, 1000, 2000, 5000, 10000, 20000, 50000, 100000, 200000,
            500000, 1000000, 2000000, 5000000, 10000000, 20000000,
            50000000, 100000000, 200000000, 500000000, 1000000000]
     pool = multiprocessing.Pool()
-    pool.map(coordinate_to_profiles, itertools.product(files[:1], Res))
+    pool.map(coordinate_to_profiles, itertools.product(files[0:Nfiles], Res))
