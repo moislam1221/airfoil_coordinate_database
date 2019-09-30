@@ -49,7 +49,7 @@ def coordinate_to_profiles(args):
             p.kill()
 
 if __name__ == '__main__':
-    Nfiles = 1513
+    Nfiles = 1516
     files = sorted(os.listdir(os.path.join(basepath, 'coordinates')))
     Res = [500, 1000, 2000, 5000, 10000, 20000, 50000, 100000, 200000,
            500000, 1000000, 2000000, 5000000, 10000000, 20000000,
