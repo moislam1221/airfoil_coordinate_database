@@ -20,8 +20,6 @@ def extract_coordinates(coordPath, fname):
         next(f)
         for line in f:
             coordinates = line.split()
-            if (fname == 's1223rtl'):
-                print(coordinates)
             x = float(coordinates[0])
             y = float(coordinates[1])
             xProfile.append(x) 
