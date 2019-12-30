@@ -179,8 +179,8 @@ def compute_v(Uy, u_prev_dx, ds, y):
     v[1:] = integrate.cumtrapz(f, dx=dy)
     return v
 
-## Plotting routine ##
-def plot_BL(subpath, airfoil, Re, iters):
+## Plotting routines ##
+def plot_BL_all_alphas(subpath, airfoil, Re, iters):
    
     for i in range(0, iters):
         pylab.figure()
@@ -197,13 +197,44 @@ def plot_BL(subpath, airfoil, Re, iters):
         print("Plotting for point " + str(i))
         plotpath = os.path.join(basepath, 'profiles', airfoil, 'boundaryLayers')
         if not os.path.exists(plotpath): os.system('mkdir ' + plotpath)
-        plotting_directory = os.path.join(plotpath, 'BL-updated.' + str(i) + '.{}..png'.format(Re))
+        plotting_directory = os.path.join(plotpath, 'BL.' + str(Re) + '.point.{}..png'.format(i))
+        pylab.grid()
+        pylab.legend()
+        pylab.xlabel('$U_{y}$', fontsize = 20)
+        pylab.ylabel('$y$', fontsize = 20)
+        pylab.title('Re = ' + str(Re) + ', point = ' + str(i), fontsize = 20)
+        pylab.xticks(fontsize = 16)
+        pylab.yticks(fontsize = 16)
+        pylab.tight_layout()
+        pylab.savefig(plotting_directory)
+        pylab.close() 
+    
+    return 0
+
+def plot_BL_all_points(subpath, airfoil, Re, iters):
+   
+    for alpha in range(-4, 9): # 9): # -4, 9
+        pylab.figure()
+        for i in range(0, iters):
+	    # Extract the Uy profile
+            UyDirectory = os.path.join(subpath, 'Uy.' + str(i) + '.{}.npy'.format(alpha))
+            velocity_profile = load(UyDirectory)
+            y = velocity_profile[0,:]
+            Uy = velocity_profile[1,:]
+            # Plot the figure
+            pylab.plot(Uy, y, linewidth=2, label='i = ' + str(i))
+
+	# Plot boundary layers for all x-points (for specific airfoil and Re number and alpha)
+        print("Plotting for alpha " + str(alpha))
+        plotpath = os.path.join(basepath, 'profiles', airfoil, 'boundaryLayers')
+        if not os.path.exists(plotpath): os.system('mkdir ' + plotpath)
+        plotting_directory = os.path.join(plotpath, 'BL.' + str(Re) + '.alpha.{}.png'.format(alpha))
         pylab.grid()
         pylab.legend()
         pylab.xlabel('$U_{y}$', fontsize = 20)
         pylab.ylabel('$y$', fontsize = 20)
         # pylab.title(airfoil + ' at Re = ' + str(Re), fontsize = 20)
-        pylab.title('Re = ' + str(Re), fontsize = 20)
+        pylab.title('Re = ' + str(Re) + ', alpha = ' + str(alpha), fontsize = 20)
         pylab.xticks(fontsize = 16)
         pylab.yticks(fontsize = 16)
         pylab.tight_layout()
@@ -247,7 +278,8 @@ def solve_and_plot_BL(args):
             # Update index of point in direction going towards the trailing edge
             idx = idx-1
         
-    plot_BL(subpath, airfoil, Re, nxGrids)
+    plot_BL_all_alphas(subpath, airfoil, Re, nxGrids)
+    plot_BL_all_points(subpath, airfoil, Re, nxGrids)
     
 if __name__ == '__main__':
     Nfiles = 1516
