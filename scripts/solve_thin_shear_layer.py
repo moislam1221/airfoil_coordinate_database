@@ -182,9 +182,9 @@ def compute_v(Uy, u_prev_dx, ds, y):
 ## Plotting routine ##
 def plot_BL(subpath, airfoil, Re, iters):
    
-    for i in range(0, iters+1):
+    for i in range(0, iters):
         pylab.figure()
-        for alpha in range(-4, -3): # 9): # -4, 9
+        for alpha in range(-4, 9): # 9): # -4, 9
 	    # Extract the Uy profile
             UyDirectory = os.path.join(subpath, 'Uy.' + str(i) + '.{}.npy'.format(alpha))
             velocity_profile = load(UyDirectory)
@@ -197,7 +197,7 @@ def plot_BL(subpath, airfoil, Re, iters):
         print("Plotting for point " + str(i))
         plotpath = os.path.join(basepath, 'profiles', airfoil, 'boundaryLayers')
         if not os.path.exists(plotpath): os.system('mkdir ' + plotpath)
-        plotting_directory = os.path.join(plotpath, 'BL.' + str(i) + '.{}.10dstar.png'.format(Re))
+        plotting_directory = os.path.join(plotpath, 'BL-updated.' + str(i) + '.{}..png'.format(Re))
         pylab.grid()
         pylab.legend()
         pylab.xlabel('$U_{y}$', fontsize = 20)
@@ -221,7 +221,7 @@ def solve_and_plot_BL(args):
         # Extract data about boundary layer from correct file 
         dirname = os.path.join(subpath, 'laminar.{}.npy'.format(alpha))
         s, Ue, Dstar, Theta = load(dirname)
-        s0, idx, ds = extract_stagnation_point(s, Ue)
+        s0, idx, ds = extract_stagnation_point(s, Ue) 
         # For every x-point, compute the boundary layer profile U(y)
         # while idx > 0:
         nyGrids = 100
@@ -234,6 +234,7 @@ def solve_and_plot_BL(args):
             else:
                 u_prev_dx = Uy
                 Ue_ahead = Ue[idx+1]
+                ds = abs(s[idx+1] - s[idx]) # recompute distance between points at every step
             # Compute Ue*dUedx with finite difference
             Ue_dUedx = compute_constant_term_1storder(Ue[idx], Ue_ahead, ds)
             # Compute U(y) from TSL equations
@@ -243,9 +244,10 @@ def solve_and_plot_BL(args):
             v = compute_v(Uy, u_prev_dx, ds, y)
             # Save results and decrement idx
             save(os.path.join(subpath, 'Uy.' + str(i) + '.{}.npy'.format(alpha)), velocity_profile)
+            # Update index of point in direction going towards the trailing edge
             idx = idx-1
         
-    # plot_BL(subpath, airfoil, Re, num_x_points)
+    plot_BL(subpath, airfoil, Re, nxGrids)
     
 if __name__ == '__main__':
     Nfiles = 1516
@@ -253,6 +255,6 @@ if __name__ == '__main__':
     Res = [500, 1000, 2000, 5000, 10000, 20000, 50000, 100000, 200000,
            500000, 1000000, 2000000, 5000000, 10000000, 20000000,
            50000000, 100000000, 200000000, 500000000, 1000000000]
-    # solve_and_plot_BL((files[0], 1000))
-    pool = multiprocessing.Pool()
-    pool.map(solve_and_plot_BL, itertools.product(files[0:1], Res))
+    solve_and_plot_BL((files[0], 1000))
+    # pool = multiprocessing.Pool()
+    # pool.map(solve_and_plot_BL, itertools.product(files[0:1], Res))
