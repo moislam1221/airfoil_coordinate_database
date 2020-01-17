@@ -63,35 +63,74 @@ def compute_constant_term(idx, s, Ue):
     return U_0 * dUedx
 
 ## Functions for Newton-Raphson iterations ##
-def compute_residual(u_current, u_prev_dx, Ue_dUedx, nu, v, dy, ds):
+def compute_residual(u_current, u_prev_dx, Ue_dUedx, nu, v, dy_array, ds):
 
     # Obtain grid length 
     nGrids = len(u_current)
     # Initialize residual
     R = zeros(nGrids)
+    # Create augmented dy array
+    dy_array_aug = ones(nGrids+1)
+    dy_array_aug[1:-1] = dy_array
+    dy_plus = dy_array_aug[1:]
+    dy_minus = dy_array_aug[0:-1]
     # Construct all terms in the PDE: R(u) = -u*du/dx-v*du/dy+ue*due/dx+nu*d^2u/dy^2
     # term 1 u*du/dx
     term1 = -u_current[1:-1] * (u_prev_dx[1:-1] - u_current[1:-1])/(-ds) 
     # term 2 v*du/dy
-    term2 = - (v[1:-1]/(2*dy))*(u_current[2:] - u_current[0:-2])
+    # a1 = 1.0 / (2*dy)
+    # b1 = 0.0
+    # c1 = -1.0 / (2*dy)
+    a1 = dy_minus / (dy_plus * (dy_plus + dy_minus))
+    b1 = (dy_plus - dy_minus) / (dy_plus * dy_minus)
+    c1 = -dy_plus / (dy_minus * (dy_plus + dy_minus))
+    term2 = -v[1:-1] * (a1[1:-1]*u_current[2:] + b1[1:-1]*u_current[1:-1] + c1[1:-1]*u_current[0:-2]) # - (v[1:-1]/(2*dy))*(u_current[2:] - u_current[0:-2])
     # term 3 ue*due/dx
     term3 = Ue_dUedx 
     # term 4 nu*d^2u/dy^2
-    term4 = (nu/(dy*dy))* (u_current[2:] - 2*u_current[1:-1] + u_current[0:-2])
+    # a2 = 1.0 / (dy*dy)
+    # b2 = -2.0 / (dy*dy)
+    # c2 = 1.0 / (dy*dy)
+    a2 = 2.0 / (dy_plus * (dy_plus + dy_minus))
+    b2 = -2.0 / (dy_plus*dy_minus)
+    c2 = 2.0 / (dy_minus * (dy_plus + dy_minus))
+    term4 = nu * (a2[1:-1]*u_current[2:] + b2[1:-1]*u_current[1:-1] + c2[1:-1]*u_current[0:-2]) # (nu/(dy*dy))* (u_current[2:] - 2*u_current[1:-1] + u_current[0:-2])
     # combine into final residual 
     R[1:-1] = term1 + term2 + term3 + term4
 
     return R
 
-def compute_jacobian(u_current, u_prev_dx, nu, v, dy, ds):
+def compute_jacobian(u_current, u_prev_dx, nu, v, dy_array, ds):
   
     # Obtain grid length 
     nGrids = len(u_current)
 
+    dy_array_aug = ones(nGrids+1)
+    dy_array_aug[1:-1] = dy_array
+    dy_plus = dy_array_aug[1:]
+    dy_minus = dy_array_aug[0:-1]
+    
+    # Define the constants for the finite difference stencils
+    a1 = dy_minus / (dy_plus * (dy_plus + dy_minus))
+    b1 = (dy_plus - dy_minus) / (dy_plus * dy_minus)
+    c1 = -dy_plus / (dy_minus * (dy_plus + dy_minus))
+    a2 = 2.0 / (dy_plus * (dy_plus + dy_minus))
+    b2 = -2.0 / (dy_plus*dy_minus)
+    c2 = 2.0 / (dy_minus * (dy_plus + dy_minus))
+    # a1 = 1.0 / (2*dy_array)
+    # b1 = 0.0
+    # c1 = -1.0 / (2*dy_array)
+    # a2 = 1.0 / (dy_array*dy_array)
+    # b2 = -2.0 / (dy_array*dy_array)
+    # c2 = 1.0 / (dy_array*dy_array)
+
     # Construct arrays for subdiagonal, superdiagonal, and diagonal 
-    diagonal = -2*nu/(dy*dy) * ones(nGrids) + (-u_prev_dx + 2*u_current)/(-ds)
-    sub_diagonal = (nu/(dy*dy)) * ones(nGrids-1) + v[1:]/(2*dy) 
-    super_diagonal = (nu/(dy*dy)) * ones(nGrids-1) - v[0:-1]/(2*dy) 
+    diagonal = -v*b1 + nu * b2 + (-u_prev_dx + 2*u_current)/(-ds)
+    sub_diagonal = nu*c2[1:] - v[1:]*c1[1:]
+    super_diagonal = nu*a2[0:-1] - v[0:-1]*a1[0:-1]
+    # diagonal = -2*nu/(dy*dy) * ones(nGrids) + (-u_prev_dx + 2*u_current)/(-ds)
+    # sub_diagonal = (nu/(dy*dy)) * ones(nGrids-1) + v[1:]/(2*dy) 
+    # super_diagonal = (nu/(dy*dy)) * ones(nGrids-1) - v[0:-1]/(2*dy) 
 
     # Construct the jacobian
     dRdu = diag(diagonal) + diag(super_diagonal, 1) + diag(sub_diagonal, -1)
@@ -114,7 +153,7 @@ def construct_linear_system_and_solve(Ue_dUedx, Re, Ue_curr, ds, Dstar_curr, u_p
     ymax = 10*Dstar_curr
     y = linspace(ymin, ymax, nyGrids)
     dy = (ymax - ymin) / (nyGrids - 1)
-    
+    dy_array = dy * ones(nyGrids - 1) 
     # Define necessary constants (velocity, viscosity at point adjacent to stagnation point)
     nu = 1.0/Re
 
@@ -154,9 +193,9 @@ def construct_linear_system_and_solve(Ue_dUedx, Re, Ue_curr, ds, Dstar_curr, u_p
     # Perform Newton-Raphson updates
     while current_residual > TOL:
         # Construct Jacobian matrix
-        dRdu = compute_jacobian(u_current, u_prev_dx, nu, v, dy, ds)
+        dRdu = compute_jacobian(u_current, u_prev_dx, nu, v, dy_array, ds)
         # Obtain residual vector
-        R = compute_residual(u_current, u_prev_dx, Ue_dUedx, nu, v, dy, ds)
+        R = compute_residual(u_current, u_prev_dx, Ue_dUedx, nu, v, dy_array, ds)
         # Compute Jacobian matrix numerically
         # Solve system for increment on vertical velocity profile
         du = linalg.solve(dRdu, -R)
@@ -164,7 +203,7 @@ def construct_linear_system_and_solve(Ue_dUedx, Re, Ue_curr, ds, Dstar_curr, u_p
         u_next = u_current + du
         u_current = u_next
         # Compute the updated residual norm
-        R = compute_residual(u_current, u_prev_dx, Ue_dUedx, nu, v, dy, ds)
+        R = compute_residual(u_current, u_prev_dx, Ue_dUedx, nu, v, dy_array, ds)
         current_residual = linalg.norm(R)
         # print(current_residual)
         Uy = u_current
@@ -197,7 +236,7 @@ def plot_BL_all_alphas(subpath, airfoil, Re, iters):
         print("Plotting for point " + str(i))
         plotpath = os.path.join(basepath, 'profiles', airfoil, 'boundaryLayers')
         if not os.path.exists(plotpath): os.system('mkdir ' + plotpath)
-        plotting_directory = os.path.join(plotpath, 'BL.' + str(Re) + '.point.{}..png'.format(i))
+        plotting_directory = os.path.join(plotpath, 'check-nonuniform-BL.' + str(Re) + '.point.{}.png'.format(i))
         pylab.grid()
         pylab.legend()
         pylab.xlabel('$U_{y}$', fontsize = 20)
@@ -228,7 +267,7 @@ def plot_BL_all_points(subpath, airfoil, Re, iters):
         print("Plotting for alpha " + str(alpha))
         plotpath = os.path.join(basepath, 'profiles', airfoil, 'boundaryLayers')
         if not os.path.exists(plotpath): os.system('mkdir ' + plotpath)
-        plotting_directory = os.path.join(plotpath, 'BL.' + str(Re) + '.alpha.{}.png'.format(alpha))
+        plotting_directory = os.path.join(plotpath, 'check-nonuniform-BL.' + str(Re) + '.alpha.{}.png'.format(alpha))
         pylab.grid()
         pylab.legend()
         pylab.xlabel('$U_{y}$', fontsize = 20)
